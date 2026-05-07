@@ -20,6 +20,14 @@ import unicodedata
 
 from cwa_db import CWA_DB
 try:
+    from cps.calibredb_target import get_calibredb_library_args
+except ModuleNotFoundError:
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(this_dir, '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from cps.calibredb_target import get_calibredb_library_args
+try:
     from cps.utils.filename_sanitizer import get_valid_filename_shared
 except ModuleNotFoundError:
     # Add project root (parent of scripts/) to sys.path and retry
@@ -171,7 +179,7 @@ class Book:
                     time.sleep(0.5)
                 
                 result = subprocess.run(
-                    ["calibredb", "export", "--with-library", self.calibre_library, "--to-dir", metadata_temp_dir, self.book_id],
+                    ["calibredb", "export", *get_calibredb_library_args(library_path=self.calibre_library), "--to-dir", metadata_temp_dir, self.book_id],
                     env=self.calibre_env, check=False, capture_output=True, text=True, timeout=60
                 )
                 
@@ -629,7 +637,7 @@ class Enforcer:
 
     def print_library_list(self) -> None:
         """Uses the calibredb command line utility to list the books in the library"""
-        subprocess.run(["calibredb", "list", "--with-library", self.calibre_library], env=self.calibre_env, check=True)
+        subprocess.run(["calibredb", "list", *get_calibredb_library_args(library_path=self.calibre_library)], env=self.calibre_env, check=True)
 
 
     def delete_log(self, auto=True, log_path="None"):

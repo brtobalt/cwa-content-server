@@ -10,5 +10,7 @@ spec:
   ports:
     - name: http
       port: 8083
+    - name: calibre-content
+      port: 8080
   selector:
     app.service: calibre-web-automated

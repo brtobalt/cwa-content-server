@@ -31,6 +31,35 @@ from .koreader import calculate_koreader_partial_md5, CHECKSUM_VERSION
 log = logger.create()
 
 
+def _ensure_checksum_table_exists(db_connection) -> None:
+    """Create the checksum table using plain SQL as a last-resort guard."""
+    from sqlalchemy import text
+
+    is_sqlalchemy = hasattr(db_connection, 'execute') and hasattr(db_connection.execute.__self__, 'dialect')
+
+    statements = [
+        '''
+        CREATE TABLE IF NOT EXISTS book_format_checksums (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            book INTEGER NOT NULL,
+            format TEXT NOT NULL COLLATE NOCASE,
+            checksum TEXT NOT NULL,
+            version TEXT NOT NULL DEFAULT 'koreader',
+            created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (book) REFERENCES books(id) ON DELETE CASCADE
+        )
+        ''',
+        'CREATE INDEX IF NOT EXISTS idx_checksum ON book_format_checksums(checksum)',
+        'CREATE INDEX IF NOT EXISTS idx_checksum_version ON book_format_checksums(checksum, version)',
+        'CREATE INDEX IF NOT EXISTS idx_book_format ON book_format_checksums(book, format)',
+        'CREATE INDEX IF NOT EXISTS idx_created ON book_format_checksums(created)',
+    ]
+
+    for statement in statements:
+        db_connection.execute(text(statement) if is_sqlalchemy else statement)
+    db_connection.commit()
+
+
 def store_checksum(
     book_id: int,
     book_format: str,
@@ -67,6 +96,10 @@ def store_checksum(
             should_close = True
         else:
             should_close = False
+
+        from ..models import ensure_checksum_table
+        ensure_checksum_table(db_connection)
+        _ensure_checksum_table_exists(db_connection)
 
         # Detect connection type - SQLAlchemy uses text() wrapper, sqlite3 uses raw strings
         is_sqlalchemy = hasattr(db_connection, 'execute') and hasattr(db_connection.execute.__self__, 'dialect')
@@ -189,8 +222,11 @@ def get_latest_checksum(
     try:
         from ... import calibre_db
         from sqlalchemy import text
+        from ..models import ensure_checksum_table
 
         with calibre_db.engine.connect() as conn:
+            ensure_checksum_table(conn)
+            _ensure_checksum_table_exists(conn)
             result = conn.execute(text('''
                 SELECT checksum FROM book_format_checksums
                 WHERE book = :book_id
@@ -227,8 +263,11 @@ def get_checksum_history(
     try:
         from ... import calibre_db
         from sqlalchemy import text
+        from ..models import ensure_checksum_table
 
         with calibre_db.engine.connect() as conn:
+            ensure_checksum_table(conn)
+            _ensure_checksum_table_exists(conn)
             results = conn.execute(text('''
                 SELECT checksum, created, version
                 FROM book_format_checksums

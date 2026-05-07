@@ -12,6 +12,7 @@ from .file_helper import get_temp_dir
 from .subproc_wrapper import process_open
 from . import logger, config
 from .constants import SUPPORTED_CALIBRE_BINARIES
+from .calibredb_target import get_calibredb_library_target
 
 log = logger.create()
 
@@ -25,7 +26,7 @@ def do_calibre_export(book_id, book_format):
         my_env = os.environ.copy()
         if config.config_calibre_split:
             my_env['CALIBRE_OVERRIDE_DATABASE_PATH'] = os.path.join(config.config_calibre_dir, "metadata.db")
-        library_path = config.get_book_path()
+        library_path = get_calibredb_library_target(config)
         opf_command = [calibredb_binarypath, 'export', '--dont-write-opf', '--with-library', library_path,
                        '--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
                        str(book_id)]

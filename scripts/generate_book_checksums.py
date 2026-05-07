@@ -35,6 +35,30 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from cps.progress_syncing.checksums import calculate_koreader_partial_md5, CHECKSUM_VERSION
 from cps.progress_syncing.settings import is_koreader_sync_enabled
+from cps.progress_syncing.models import ensure_checksum_table
+
+
+def _ensure_checksum_table_exists(conn):
+    statements = [
+        '''
+        CREATE TABLE IF NOT EXISTS book_format_checksums (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            book INTEGER NOT NULL,
+            format TEXT NOT NULL COLLATE NOCASE,
+            checksum TEXT NOT NULL,
+            version TEXT NOT NULL DEFAULT 'koreader',
+            created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (book) REFERENCES books(id) ON DELETE CASCADE
+        )
+        ''',
+        'CREATE INDEX IF NOT EXISTS idx_checksum ON book_format_checksums(checksum)',
+        'CREATE INDEX IF NOT EXISTS idx_checksum_version ON book_format_checksums(checksum, version)',
+        'CREATE INDEX IF NOT EXISTS idx_book_format ON book_format_checksums(book, format)',
+        'CREATE INDEX IF NOT EXISTS idx_created ON book_format_checksums(created)',
+    ]
+    for statement in statements:
+        conn.execute(statement)
+    conn.commit()
 
 
 def _flush_batch(metadata_db: str, batch_rows):
@@ -42,6 +66,8 @@ def _flush_batch(metadata_db: str, batch_rows):
         return
     try:
         conn = sqlite3.connect(metadata_db, timeout=30)
+        ensure_checksum_table(conn)
+        _ensure_checksum_table_exists(conn)
         cur = conn.cursor()
         cur.executemany(
             '''
@@ -93,6 +119,8 @@ def generate_checksums(library_path: str, books_path: str = None, force: bool = 
     try:
         # Read missing formats without holding the DB open during checksum computation
         conn = sqlite3.connect(metadata_db, timeout=30)
+        ensure_checksum_table(conn)
+        _ensure_checksum_table_exists(conn)
         cur = conn.cursor()
 
         if force:

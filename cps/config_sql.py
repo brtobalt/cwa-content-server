@@ -66,6 +66,7 @@ class _Settings(_Base):
     config_certfile = Column(String)
     config_keyfile = Column(String)
     config_trustedhosts = Column(String, default='')
+    config_calibre_content_server_enabled = Column(Boolean, default=True)
     config_calibre_web_title = Column(String, default='Calibre-Web Automated')
     config_books_per_page = Column(Integer, default=60)
     config_random_books = Column(Integer, default=4)

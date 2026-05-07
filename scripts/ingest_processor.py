@@ -22,6 +22,14 @@ from kindle_epub_fixer import EPUBFixer
 import audiobook
 import requests
 
+try:
+    from cps.calibredb_target import get_calibredb_library_args
+except ModuleNotFoundError:
+    cps_path = os.path.dirname(os.path.dirname(__file__))
+    if cps_path not in sys.path:
+        sys.path.append(cps_path)
+    from cps.calibredb_target import get_calibredb_library_args
+
 # Optional: enable GDrive sync and auto-send by importing cps modules when available
 _GDRIVE_AVAILABLE = False
 _CPS_AVAILABLE = False
@@ -748,7 +756,8 @@ class NewBookProcessor:
         try:
             if text:
                 result = subprocess.run([
-                    "calibredb", "add", str(staged_path), "--automerge", self.cwa_settings['auto_ingest_automerge'], f"--library-path={self.library_dir}"
+                    "calibredb", "add", str(staged_path), "--automerge", self.cwa_settings['auto_ingest_automerge'],
+                    *get_calibredb_library_args(library_path=self.library_dir)
                 ], env=self.calibre_env, check=True, capture_output=True, text=True)
                 added_ids = self._parse_added_book_ids((result.stdout or '') + '\n' + (result.stderr or ''))
                 if added_ids:
@@ -770,7 +779,7 @@ class NewBookProcessor:
 
                 add_command = [
                     "calibredb", "add", str(staged_path), "--automerge", self.cwa_settings['auto_ingest_automerge'],
-                    f"--library-path={self.library_dir}",
+                    *get_calibredb_library_args(library_path=self.library_dir),
                 ]
                 if _title:
                     add_command.extend(["--title", _title])
@@ -907,7 +916,8 @@ class NewBookProcessor:
 
         try:
             result = subprocess.run([
-                "calibredb", "add_format", str(book_id), str(staged_path), f"--library-path={self.library_dir}"
+                "calibredb", "add_format", str(book_id), str(staged_path),
+                *get_calibredb_library_args(library_path=self.library_dir)
             ], env=self.calibre_env, check=True, capture_output=True, text=True)
             print(f"[ingest-processor] Added new format for book id {book_id}: {os.path.basename(str(staged_path))}", flush=True)
             if self.cwa_settings['auto_backup_imports']:

@@ -1,0 +1,107 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+is_true() {
+    case "${1,,}" in
+        true|yes|1|on) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+if is_true "${DISABLE_CALIBRE_CONTENT_SERVER:-false}"; then
+    echo "[calibre-content-server] DISABLE_CALIBRE_CONTENT_SERVER=${DISABLE_CALIBRE_CONTENT_SERVER}. Content server disabled."
+    exec sleep infinity
+fi
+
+CALIBRE_CONTENT_SERVER_PORT="${CALIBRE_CONTENT_SERVER_PORT:-8080}"
+CALIBRE_CONTENT_SERVER_LIBRARY="${CALIBRE_CONTENT_SERVER_LIBRARY:-/calibre-library}"
+APP_DB="${CWA_APP_DB_PATH:-/config/app.db}"
+CHECK_INTERVAL="${CALIBRE_CONTENT_SERVER_CHECK_INTERVAL:-5}"
+content_server_pid=""
+
+export HOME=/config
+export CALIBRE_CONFIG_DIRECTORY="${CALIBRE_CONFIG_DIRECTORY:-/config/.config/calibre}"
+export CALIBRE_CONFIG_DIR="${CALIBRE_CONFIG_DIR:-$CALIBRE_CONFIG_DIRECTORY}"
+
+if [[ ! "$CALIBRE_CONTENT_SERVER_PORT" =~ ^[0-9]+$ ]] || (( CALIBRE_CONTENT_SERVER_PORT < 1 || CALIBRE_CONTENT_SERVER_PORT > 65535 )); then
+    echo "[calibre-content-server] Invalid CALIBRE_CONTENT_SERVER_PORT='$CALIBRE_CONTENT_SERVER_PORT'; using 8080."
+    CALIBRE_CONTENT_SERVER_PORT="8080"
+fi
+
+if [[ ! -d "$CALIBRE_CONTENT_SERVER_LIBRARY" ]]; then
+    echo "[calibre-content-server] Library path '$CALIBRE_CONTENT_SERVER_LIBRARY' does not exist."
+    exit 1
+fi
+
+if [[ ! "$CHECK_INTERVAL" =~ ^[0-9]+$ ]] || (( CHECK_INTERVAL < 1 )); then
+    CHECK_INTERVAL="5"
+fi
+
+is_enabled_in_config() {
+    local enabled
+
+    if [[ ! -f "$APP_DB" ]]; then
+        return 0
+    fi
+
+    enabled="$(sqlite3 "$APP_DB" "SELECT COALESCE(config_calibre_content_server_enabled, 1) FROM settings LIMIT 1;" 2>/dev/null || true)"
+    case "${enabled,,}" in
+        0|false|off|no) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+is_content_server_running() {
+    [[ -n "$content_server_pid" ]] && kill -0 "$content_server_pid" 2>/dev/null
+}
+
+start_content_server() {
+    echo "[calibre-content-server] Starting Calibre Content Server on port ${CALIBRE_CONTENT_SERVER_PORT} for ${CALIBRE_CONTENT_SERVER_LIBRARY}"
+    # shellcheck disable=SC2086
+    s6-setuidgid abc calibre-server \
+        --listen-on 0.0.0.0 \
+        --port "${CALIBRE_CONTENT_SERVER_PORT}" \
+        --enable-local-write \
+        ${CALIBRE_CONTENT_SERVER_EXTRA_ARGS:-} \
+        "${CALIBRE_CONTENT_SERVER_LIBRARY}" &
+    content_server_pid="$!"
+}
+
+stop_content_server() {
+    if ! is_content_server_running; then
+        content_server_pid=""
+        return
+    fi
+
+    echo "[calibre-content-server] Stopping Calibre Content Server."
+    kill "$content_server_pid" 2>/dev/null || true
+    wait "$content_server_pid" 2>/dev/null || true
+    content_server_pid=""
+}
+
+cleanup() {
+    stop_content_server
+    exit 0
+}
+
+trap cleanup TERM INT
+
+echo "[calibre-content-server] Monitoring admin setting config_calibre_content_server_enabled."
+
+while true; do
+    if is_enabled_in_config; then
+        if ! is_content_server_running; then
+            start_content_server
+        fi
+    else
+        stop_content_server
+    fi
+
+    if [[ -n "$content_server_pid" ]] && ! kill -0 "$content_server_pid" 2>/dev/null; then
+        wait "$content_server_pid" 2>/dev/null || true
+        content_server_pid=""
+    fi
+
+    sleep "$CHECK_INTERVAL" &
+    wait "$!" || true
+done

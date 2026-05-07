@@ -2295,6 +2295,7 @@ def _configuration_update_helper():
         if config.config_certfile and not os.path.isfile(config.config_certfile):
             return _configuration_result(_('Certfile Location is not Valid, Please Enter Correct Path'))
 
+        _config_checkbox(to_save, "config_calibre_content_server_enabled")
         _config_checkbox_int(to_save, "config_uploading")
         _config_checkbox_int(to_save, "config_unicode_filename")
         _config_checkbox_int(to_save, "config_embed_metadata")

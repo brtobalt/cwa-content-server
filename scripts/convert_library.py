@@ -23,6 +23,13 @@ import grp
 
 from cwa_db import CWA_DB
 from kindle_epub_fixer import EPUBFixer
+try:
+    from cps.calibredb_target import get_calibredb_library_args
+except ModuleNotFoundError:
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from cps.calibredb_target import get_calibredb_library_args
 
 ### Global Variables
 convert_library_log_file = "/config/convert-library.log"
@@ -176,7 +183,7 @@ class LibraryConverter:
             print_and_log(f"[convert-library]: Retrieving book format information from library: {self.library_dir}")
             
         try:
-            args = ["calibredb", "list", "--fields=id,formats", f"--library-path={self.library_dir}", "--for-machine"]
+            args = ["calibredb", "list", "--fields=id,formats", *get_calibredb_library_args(library_path=self.library_dir), "--for-machine"]
             
             if self.verbose:
                 print_and_log(f"[convert-library]: Running command: {' '.join(args)}")
@@ -427,7 +434,7 @@ class LibraryConverter:
 
             try: # Import converted book to library. As of V3.0.0, "add_format" is used instead of "add"
                 with subprocess.Popen(
-                    ["calibredb", "add_format", book_id, target_filepath, f"--library-path={self.library_dir}"],
+                    ["calibredb", "add_format", book_id, target_filepath, *get_calibredb_library_args(library_path=self.library_dir)],
                     env=self.calibre_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,

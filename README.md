@@ -359,6 +359,9 @@ services:
       # Override the default port (8083) for the web server.
       # Accepts any valid port number.
       - CWA_PORT_OVERRIDE=8083
+      # Override the default port (8080) for the Calibre Content Server.
+      # Set DISABLE_CALIBRE_CONTENT_SERVER=true to turn it off.
+      - CALIBRE_CONTENT_SERVER_PORT=8080
     volumes:
       # CW users migrating should stop their existing CW instance, make a copy of the config folder, and bind that here to carry over all of their user settings ect.
       - /path/to/config/folder:/config
@@ -372,6 +375,8 @@ services:
     ports:
       # Change the first number to change the port you want to access the Web UI, not the second
       - 8083:8083
+      # Change the first number to change the port you want to access the Calibre Content Server, not the second
+      - 8080:8080
     # If you set CWA_PORT_OVERRIDE to a port below 1024, you may need to uncomment the following line:
     # cap_add:
     #   - NET_BIND_SERVICE
@@ -420,6 +425,7 @@ And just like that, Calibre-Web Automated should be up and running! **HOWEVER** 
 ## _Calibre-Web Quick Start Guide_
 
 1. Open your browser and navigate to http://localhost:8083 or http://localhost:8083/opds for the OPDS catalog
+  - The bundled Calibre Content Server is available at http://localhost:8080 by default.
 2. Log in with the default admin credentials (_below_)
 3. Configure your Calibre-Web Automated instance via the Admin Page
   - If you need help with any of the settings, consult the CWA Wiki [here](https://github.com/crocodilestick/Calibre-Web-Automated/wiki)

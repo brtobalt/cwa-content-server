@@ -24,6 +24,7 @@ from flask_babel import gettext as _
 from cps.kobo_sync_status import remove_synced_book
 from cps.ub import init_db_thread
 from cps.file_helper import get_temp_dir
+from cps.calibredb_target import get_calibredb_library_target
 
 from cps.tasks.mail import TaskEmail
 from cps import gdriveutils, helper
@@ -262,9 +263,7 @@ class TaskConvert(CalibreTask):
                 my_env = os.environ.copy()
                 if config.config_calibre_split:
                     my_env['CALIBRE_OVERRIDE_DATABASE_PATH'] = os.path.join(config.config_calibre_dir, "metadata.db")
-                    library_path = config.config_calibre_split_dir
-                else:
-                    library_path = config.config_calibre_dir
+                library_path = get_calibredb_library_target(config)
 
                 opf_command = [calibredb_binarypath, 'show_metadata', '--as-opf', str(self.book_id),
                                '--with-library', library_path]
